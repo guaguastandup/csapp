@@ -1,0 +1,13 @@
+This is bomb 11 for lab csapp2008.
+
+It is owned by the following student(s):
+SA08225276
+SA08225226
+
+
+二进制炸弹是一个由C语言编译成的Linux可执行文件,包含若干个phase, 
+每个phase会从输入文件中读入一行字符串, 所有字符串正确则炸弹被排除, 否则…..
+任务是通过对可执行文件的逆向来解出这些字符串
+用以下命令来运行, 其中solution.txt是输入文件
+./bomb  solution.txt
+solution.txt中每行对应一个phase
