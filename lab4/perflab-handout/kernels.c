@@ -31,8 +31,7 @@ team_t team = {
  * naive_rotate - The naive baseline version of rotate 
  */
 char naive_rotate_descr[] = "naive_rotate: Naive baseline implementation";
-void naive_rotate(int dim, pixel *src, pixel *dst) 
-{
+void naive_rotate(int dim, pixel *src, pixel *dst) {
     int i, j;
 
     for (i = 0; i < dim; i++)
@@ -43,8 +42,7 @@ void naive_rotate(int dim, pixel *src, pixel *dst)
 }
 
 char naive_rotate2_descr[] = "naive_rotate2";
-void naive_rotate2(int dim, pixel *src, pixel *dst) 
-{
+void naive_rotate2(int dim, pixel *src, pixel *dst) {
     int i, j;
 
     for(j = 0; j < dim; j++) 
@@ -187,15 +185,15 @@ void rotate(int dim, pixel *src, pixel *dst)
 
 void register_rotate_functions() 
 {
-    add_rotate_function(&rotate, rotate_descr);  
+    // add_rotate_function(&rotate, rotate_descr);  
     
-    add_rotate_function(&naive_rotate, naive_rotate_descr);   
-    add_rotate_function(&naive_rotate2, naive_rotate2_descr);
-    add_rotate_function(&naive_rotate32, naive_rotate32_descr); 
+    // add_rotate_function(&naive_rotate, naive_rotate_descr);   
+    // add_rotate_function(&naive_rotate2, naive_rotate2_descr);
+    // add_rotate_function(&naive_rotate32, naive_rotate32_descr); 
 
-    add_rotate_function(&naive_rotate32_unloop, naive_rotate32_unloop_descr); 
-    add_rotate_function(&naive_rotate16_unloop, naive_rotate16_unloop_descr);
-    add_rotate_function(&naive_rotate8_unloop, naive_rotate8_unloop_descr);
+    // add_rotate_function(&naive_rotate32_unloop, naive_rotate32_unloop_descr); 
+    // add_rotate_function(&naive_rotate16_unloop, naive_rotate16_unloop_descr);
+    // add_rotate_function(&naive_rotate8_unloop, naive_rotate8_unloop_descr);
     
     /* ... Register additional test functions here */
 }
@@ -291,16 +289,117 @@ void naive_smooth(int dim, pixel *src, pixel *dst)
 	    dst[RIDX(i, j, dim)] = avg(dim, i, j, src);
 }
 
+pixel_sum p_sum[4096][4096];
+static void pixel3(pixel_sum *sum, pixel a, pixel b, pixel c) {
+    sum->red = (int)(a.red + b.red + c.red);
+    sum->green = (int)(a.green + b.green + c.green);
+    sum->blue = (int)(a.blue + b.blue + c.blue);
+}
+
+static void pixel2(pixel_sum *sum, pixel a, pixel b) {
+    sum->red = (int)(a.red + b.red);
+    sum->green = (int)(a.green + b.green);
+    sum->blue = (int)(a.blue + b.blue);
+}
+
+static void addpixel(pixel_sum *a, pixel_sum b) {
+    a->red += b.red;
+    a->green += b.green;
+    a->blue += b.blue;
+}
+
+static void sum2pixel(pixel *p, pixel_sum sum, int num) {
+    p->red = (unsigned short)(sum.red / num);
+    p->green = (unsigned short)(sum.green / num);
+    p->blue = (unsigned short)(sum.blue / num);
+}
 /*
  * smooth - Your current working version of smooth. 
  * IMPORTANT: This is the version you will be graded on
  */
-char smooth_descr[] = "smooth: Current working version";
+char smooth_descr[] = "smooth: naive version";
 void smooth(int dim, pixel *src, pixel *dst) 
 {
     naive_smooth(dim, src, dst);
 }
 
+char my_smooth_descr[] = "smooth: Current working version";
+void my_smooth(int dim, pixel *src, pixel *dst) {
+    pixel_sum sum;
+    int r,c;
+    int dim1 = dim - 1;
+    //初始化
+    for(r = 0; r < dim; r++){
+        for(c = 0; c < dim; c++){
+            initialize_pixel_sum(&p_sum[r][c]);
+        }
+    }
+    //计算中间部分
+    for(r = 1; r < dim1; r++){
+        for(c = 1; c < dim1; c++){
+            pixel3(&sum, src[RIDX(r, c-1, dim)], src[RIDX(r, c, dim)], src[RIDX(r, c + 1, dim)]);
+            addpixel(&p_sum[r - 1][c], sum);
+            addpixel(&p_sum[r][c], sum);
+            addpixel(&p_sum[r + 1][c], sum);
+        }
+    }
+    //计算上下两边
+    for(c = 1; c < dim1; c++){
+        pixel3(&sum,src[RIDX(0, c - 1, dim)], src[RIDX(0, c, dim)], src[RIDX(0, c + 1, dim)]);
+        addpixel(&p_sum[0][c], sum);
+        addpixel(&p_sum[1][c], sum);
+        pixel3(&sum, src[RIDX(dim1, c - 1, dim)], src[RIDX(dim1, c, dim)], src[RIDX(dim1, c + 1, dim)]);
+        addpixel(&p_sum[dim - 2][c], sum);
+        addpixel(&p_sum[dim1][c], sum);
+    }
+    //计算左右两边
+    for(r = 1; r < dim1; r++){
+        pixel2(&sum, src[RIDX(r, 0, dim)], src[RIDX(r, 1, dim)]);
+
+        addpixel(&p_sum[r - 1][0], sum);
+        addpixel(&p_sum[r][0], sum);
+        addpixel(&p_sum[r+1][0], sum);
+
+        pixel2(&sum,src[RIDX(r, dim - 2, dim)], src[RIDX(r, dim1, dim)]);
+
+        addpixel(&p_sum[r - 1][dim1], sum);
+        addpixel(&p_sum[r][dim1], sum);
+        addpixel(&p_sum[r + 1][dim1], sum);
+    }
+    //计算四角
+    pixel2(&sum,src[RIDX(0, 0, dim)], src[RIDX(0, 1, dim)]);
+    addpixel(&p_sum[0][0], sum);
+    addpixel(&p_sum[1][0], sum);
+    pixel2(&sum, src[RIDX(0, dim - 2, dim)], src[RIDX(0, dim1, dim)]);
+    addpixel(&p_sum[0][dim1], sum);
+    addpixel(&p_sum[1][dim1], sum);
+    pixel2(&sum,src[RIDX(dim1, 0, dim)], src[RIDX(dim1, 1, dim)]);
+    addpixel(&p_sum[dim-2][0], sum);
+    addpixel(&p_sum[dim1][0], sum);
+    pixel2(&sum, src[RIDX(dim1, dim - 2, dim)], src[RIDX(dim1, dim1, dim)]);
+    addpixel(&p_sum[dim - 2][dim1], sum);
+    addpixel(&p_sum[dim1][dim1], sum);
+    //中部有9个相邻点
+    for(r = 1; r < dim1; r++){
+        for(c = 1; c < dim1; c++){
+            sum2pixel(&dst[RIDX(r,c,dim)], p_sum[r][c], 9);
+        }
+        sum2pixel(&dst[RIDX(r, 0, dim)], p_sum[r][0],6);
+        sum2pixel(&dst[RIDX(r, dim1, dim)], p_sum[r][dim1], 6);
+    }
+    
+    //四边有6个相邻点
+    for(c = 1; c < dim1; c++){
+        sum2pixel(&dst[RIDX(0,c, dim)], p_sum[0][c], 6);
+        sum2pixel(&dst[RIDX(dim1, c, dim)], p_sum[dim1][c], 6);
+    }
+    
+    //四角有4个相邻点
+    sum2pixel(&dst[RIDX(0, 0, dim)], p_sum[0][0], 4);
+    sum2pixel(&dst[RIDX(dim1, 0, dim)], p_sum[dim1][0], 4);
+    sum2pixel(&dst[RIDX(0, dim1, dim)], p_sum[0][dim1], 4);
+    sum2pixel(&dst[RIDX(dim1, dim1, dim)], p_sum[dim1][dim1], 4);
+}
 
 /********************************************************************* 
  * register_smooth_functions - Register all of your different versions
@@ -311,8 +410,8 @@ void smooth(int dim, pixel *src, pixel *dst)
  *********************************************************************/
 
 void register_smooth_functions() {
-    // add_smooth_function(&smooth, smooth_descr);
-    // add_smooth_function(&naive_smooth, naive_smooth_descr);
+    add_smooth_function(&naive_smooth, naive_smooth_descr);
+    add_smooth_function(&my_smooth, my_smooth_descr);
     /* ... Register additional test functions here */
 }
 
